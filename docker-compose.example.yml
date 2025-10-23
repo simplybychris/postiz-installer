@@ -1,0 +1,130 @@
+version: "3.7"
+
+services:
+  traefik:
+    image: "traefik"
+    restart: always
+    command:
+      - "--api=true"
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.web.http.redirections.entryPoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
+      - "--entrypoints.websecure.address=:443"
+      - "--certificatesresolvers.mytlschallenge.acme.tlschallenge=true"
+      - "--certificatesresolvers.mytlschallenge.acme.email=${SSL_EMAIL}"
+      - "--certificatesresolvers.mytlschallenge.acme.storage=/letsencrypt/acme.json"
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - traefik_data:/letsencrypt
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+
+  n8n:
+    image: docker.n8n.io/n8nio/n8n
+    restart: always
+    ports:
+      - "127.0.0.1:5678:5678"
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.n8n.rule=Host(`${N8N_SUBDOMAIN}.${DOMAIN_NAME}`)
+      - traefik.http.routers.n8n.tls=true
+      - traefik.http.routers.n8n.entrypoints=web,websecure
+      - traefik.http.routers.n8n.tls.certresolver=mytlschallenge
+      - traefik.http.middlewares.n8n.headers.SSLRedirect=true
+      - traefik.http.middlewares.n8n.headers.STSSeconds=315360000
+      - traefik.http.middlewares.n8n.headers.browserXSSFilter=true
+      - traefik.http.middlewares.n8n.headers.contentTypeNosniff=true
+      - traefik.http.middlewares.n8n.headers.forceSTSHeader=true
+      - traefik.http.middlewares.n8n.headers.SSLHost=${DOMAIN_NAME}
+      - traefik.http.middlewares.n8n.headers.STSIncludeSubdomains=true
+      - traefik.http.middlewares.n8n.headers.STSPreload=true
+      - traefik.http.routers.n8n.middlewares=n8n@docker
+    environment:
+      - N8N_HOST=${N8N_SUBDOMAIN}.${DOMAIN_NAME}
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=https
+      - NODE_ENV=production
+      - WEBHOOK_URL=https://${N8N_SUBDOMAIN}.${DOMAIN_NAME}/
+      - GENERIC_TIMEZONE=${GENERIC_TIMEZONE}
+    volumes:
+      - n8n_data:/home/node/.n8n
+      - /local-files:/files
+
+  postgres:
+    image: postgres:16-alpine
+    restart: always
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    restart: always
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  postiz:
+    image: ghcr.io/gitroomhq/postiz-app:latest
+    restart: always
+    environment:
+      - MAIN_URL=https://${POSTIZ_SUBDOMAIN}.${DOMAIN_NAME}
+      - FRONTEND_URL=https://${POSTIZ_SUBDOMAIN}.${DOMAIN_NAME}
+      - NEXT_PUBLIC_BACKEND_URL=https://${POSTIZ_SUBDOMAIN}.${DOMAIN_NAME}/api
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      - REDIS_URL=redis://redis:6379
+      - BACKEND_INTERNAL_URL=http://127.0.0.1:3000
+      - JWT_SECRET=${JWT_SECRET}
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
+      - NEXTAUTH_URL=https://${POSTIZ_SUBDOMAIN}.${DOMAIN_NAME}
+      - UPLOAD_DIRECTORY=/uploads
+    volumes:
+      - postiz_uploads:/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:5000:5000"
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.postiz.rule=Host(`${POSTIZ_SUBDOMAIN}.${DOMAIN_NAME}`)
+      - traefik.http.routers.postiz.tls=true
+      - traefik.http.routers.postiz.entrypoints=web,websecure
+      - traefik.http.routers.postiz.tls.certresolver=mytlschallenge
+      - traefik.http.services.postiz.loadbalancer.server.port=5000
+      - traefik.http.middlewares.postiz.headers.SSLRedirect=true
+      - traefik.http.middlewares.postiz.headers.STSSeconds=315360000
+      - traefik.http.middlewares.postiz.headers.browserXSSFilter=true
+      - traefik.http.middlewares.postiz.headers.contentTypeNosniff=true
+      - traefik.http.middlewares.postiz.headers.forceSTSHeader=true
+      - traefik.http.middlewares.postiz.headers.SSLHost=${DOMAIN_NAME}
+      - traefik.http.middlewares.postiz.headers.STSIncludeSubdomains=true
+      - traefik.http.middlewares.postiz.headers.STSPreload=true
+      - traefik.http.routers.postiz.middlewares=postiz@docker
+
+volumes:
+  traefik_data:
+    external: true
+  n8n_data:
+    external: true
+  postgres_data:
+  redis_data:
+  postiz_uploads:

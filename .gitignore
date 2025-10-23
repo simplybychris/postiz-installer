@@ -1,0 +1,24 @@
+# Environment files
+.env
+*.env
+!.env.example
+
+# Backups
+backup_*/
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Local testing
+docker-compose.yml
+!docker-compose.example.yml
