@@ -338,6 +338,8 @@ services:
       - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
       - NEXTAUTH_URL=https://${POSTIZ_SUBDOMAIN}.${DOMAIN_NAME}
       - UPLOAD_DIRECTORY=/uploads
+      - STORAGE_PROVIDER=local
+      - DISABLE_REGISTRATION=true
     volumes:
       - postiz_uploads:/uploads
     depends_on:
