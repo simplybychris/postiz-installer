@@ -189,7 +189,14 @@ print_header "Podsumowanie konfiguracji"
 echo "Domena:               $DOMAIN_NAME"
 echo "Subdomena Postiz:     $POSTIZ_SUBDOMAIN"
 echo "URL Postiz:           https://${POSTIZ_SUBDOMAIN}.${DOMAIN_NAME}"
-echo "Wersja obrazu:        $([ "$USE_CUSTOM_IMAGE" == "true" ] && echo "Custom z patchem LinkedIn" || echo "Oryginalny z GitHub")"
+
+# Wyświetl wersję obrazu (fix: unikaj && || w command substitution z set -e)
+if [ "$USE_CUSTOM_IMAGE" == "true" ]; then
+    echo "Wersja obrazu:        Custom z patchem LinkedIn"
+else
+    echo "Wersja obrazu:        Oryginalny z GitHub"
+fi
+
 echo "Baza danych:          $POSTGRES_DB"
 echo "Użytkownik DB:        $POSTGRES_USER"
 echo "Hasło DB:             [ukryte - zapisane w .env]"
