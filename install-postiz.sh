@@ -448,7 +448,6 @@ RUN sed -i \
     's|: await this.storage.uploadSimple(picture)|: await this.storage.uploadSimple(picture).catch((err) => { console.error("Uploading the integrations image failed."); console.error(err); return undefined; })|g' \
     /app/apps/backend/dist/libraries/nestjs-libraries/src/database/prisma/integrations/integration.service.js
 
-USER node
 DOCKERFILE_EOF
 
     print_success "Utworzono Dockerfile.postiz z patchem"
@@ -678,7 +677,7 @@ Backup:
 Configuration:
 - docker-compose.yml: /root/docker-compose.yml
 - .env: /root/.env
-$([ "$USE_CUSTOM_IMAGE" == "true" ] && echo "- Dockerfile.postiz: /root/Dockerfile.postiz (LinkedIn patch)")
+$([ "$USE_CUSTOM_IMAGE" == "true" ] && echo "- Dockerfile.postiz: /root/Dockerfile.postiz (LinkedIn patch - fixed permissions)")
 
 Volumes:
 - postgres_data
