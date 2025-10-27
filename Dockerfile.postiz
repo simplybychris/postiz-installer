@@ -1,0 +1,26 @@
+FROM ghcr.io/gitroomhq/postiz-app:latest
+
+USER root
+
+# Fix dla LinkedIn integration bug (GitHub Issue #972)
+#
+# Problem:
+# LinkedIn CDN URLs dla avatarów użytkowników wygasają i zwracają błąd 403 Forbidden.
+# Postiz próbuje pobrać i zapisać avatar przy dodawaniu integracji LinkedIn,
+# ale gdy URL wygaśnie, cała operacja się crashuje.
+#
+# Rozwiązanie:
+# Ten patch dodaje obsługę błędów (error handling) do uploadSimple(),
+# dzięki czemu nieudany upload avatara nie blokuje dodania integracji LinkedIn.
+#
+# Więcej informacji:
+# https://github.com/gitroomhq/postiz-app/issues/972
+#
+RUN sed -i \
+    's|: await this.storage.uploadSimple(picture)|: await this.storage.uploadSimple(picture).catch((err) => { console.error("Uploading the integrations image failed."); console.error(err); return undefined; })|g' \
+    /app/apps/backend/dist/libraries/nestjs-libraries/src/database/prisma/integrations/integration.service.js
+
+USER node
+
+# Ten Dockerfile jest automatycznie generowany przez install-postiz.sh
+# jeśli użytkownik wybierze opcję "Custom obraz z patchem LinkedIn"
